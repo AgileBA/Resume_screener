@@ -1,0 +1,11 @@
+# requirements.txt
+streamlit
+langchain
+langchain-google-genai
+langchain-community
+google-generativeai
+python-dotenv
+docx2txt
+pypdf
+chromadb
+pydantic==1.10.13 # Pinning pydantic for compatibility with older langchain versions if needed, good practice
