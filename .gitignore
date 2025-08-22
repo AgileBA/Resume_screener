@@ -1,31 +1,53 @@
+# ----------------------
 # Python cache
 __pycache__/
 *.pyc
 *.pyo
 *.pyd
+*.pyd
 
-# Virtual environment
+# ----------------------
+# Virtual environments
 venv/
 .env/
+.venv/
+ENV/
+env.bak/
+venv.bak/
 
-# Environment files
+# ----------------------
+# Environment & secrets
 *.env
 .env.local
 .env.*.local
 
+# ----------------------
 # Streamlit
 .streamlit/
 
-# FAISS/Chroma vector stores (auto-generated data)
+# ----------------------
+# FAISS/Chroma vector stores (auto-generated)
 chroma_store/
 faiss_index/
+*.faiss
+*.pkl
 
+# ----------------------
 # Logs
 *.log
+logs/
 
-# Jupyter notebooks checkpoints (if you ever use)
+# ----------------------
+# Jupyter
 .ipynb_checkpoints/
+*.ipynb
 
-# System files
+# ----------------------
+# VSCode / PyCharm
+.vscode/
+.idea/
+
+# ----------------------
+# OS/system files
 .DS_Store
 Thumbs.db
