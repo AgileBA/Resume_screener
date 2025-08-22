@@ -1,17 +1,16 @@
-# app.py - FINAL, DEFINITIVE, AND WORKING VERSION
+# app.py - FINAL VERSION WITH FAISS INSTEAD OF CHROMA
 
 import os
 import streamlit as st
 from dotenv import load_dotenv
 import json
-import shutil
 
 # LangChain components
 from langchain_core.prompts import PromptTemplate
 from langchain_core.output_parsers import PydanticOutputParser
 from langchain_google_genai import ChatGoogleGenerativeAI, GoogleGenerativeAIEmbeddings
 from langchain_community.document_loaders import PyPDFLoader, Docx2txtLoader, TextLoader
-from langchain_community.vectorstores import Chroma
+from langchain_community.vectorstores import FAISS
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 
 # Pydantic for data structure
@@ -21,16 +20,10 @@ from typing import List
 # --- Load Environment Variables ---
 load_dotenv()
 
-# --- THE DEFINITIVE FIX FOR THE TYPE ERROR ---
-# We will now handle the API key inside each function to be explicit.
-
-from pydantic import SecretStr
-
 @st.cache_resource
 def get_llm():
     """
     Initializes and returns the Gemini LLM.
-    Uses GOOGLE_API_KEY from environment (already loaded via dotenv).
     """
     if not os.getenv("GOOGLE_API_KEY"):
         raise ValueError("Google API Key not found. Please set it in your .env file.")
@@ -44,7 +37,6 @@ def get_llm():
 def get_embedding_model():
     """
     Initializes and returns the Google Generative AI embedding model.
-    Uses GOOGLE_API_KEY from environment (already loaded via dotenv).
     """
     if not os.getenv("GOOGLE_API_KEY"):
         raise ValueError("Google API Key not found. Please set it in your .env file.")
@@ -53,13 +45,16 @@ def get_embedding_model():
         model="models/embedding-001"
     )
 
-
 @st.cache_resource
 def get_vector_store():
-    """Initializes and returns the Chroma vector store."""
-    # This function depends on the one above, which already validates the key.
+    """Initializes and returns the FAISS vector store (persistent)."""
     embedding_function = get_embedding_model()
-    return Chroma(persist_directory="chroma_store", embedding_function=embedding_function)
+    if os.path.exists("faiss_index"):
+        return FAISS.load_local("faiss_index", embedding_function, allow_dangerous_deserialization=True)
+    else:
+        vector_store = FAISS.from_texts(["initial placeholder"], embedding_function)
+        vector_store.save_local("faiss_index")
+        return vector_store
 
 # --- Helper Function to Load Documents ---
 def load_document(file):
@@ -79,7 +74,7 @@ def load_document(file):
         else:
             st.error(f"Unsupported file format: {extension}")
             return None
-        
+
         documents = loader.load()
         text = " ".join([doc.page_content for doc in documents])
         os.remove(temp_file_path)
@@ -98,7 +93,7 @@ class ResumeAnalysis(BaseModel):
 # --- Main App Logic ---
 def main():
     st.set_page_config(page_title="🎯 AI Resume Screener", layout="wide")
-    
+
     st.markdown("""
     <style>
         .stButton>button { background-color: #4CAF50; color: white; border-radius: 8px; padding: 10px 20px; border: none; font-size: 16px; }
@@ -115,11 +110,10 @@ def main():
     except ValueError as e:
         st.error(e)
         st.stop()
-    
+
     # --- UI Tabs ---
     tab1, tab2 = st.tabs(["Analyze New Resume", "Search Past Candidates"])
 
-    # ... (The rest of the main function remains the same as the last version) ...
     # === TAB 1: Analyze New Resume ===
     with tab1:
         st.header("Analyze a New Resume")
@@ -129,7 +123,7 @@ def main():
                 job_description = st.text_area("📋 **Job Description**", height=300, placeholder="e.g., Senior Python Developer...")
             with col2:
                 uploaded_file = st.file_uploader("📄 **Upload Resume**", type=["pdf", "docx", "txt"])
-            
+
             submitted = st.form_submit_button("Analyze Resume")
 
         if submitted and job_description and uploaded_file:
@@ -148,12 +142,22 @@ def main():
                     try:
                         analysis_result = chain.invoke({"job_description": job_description, "resume_text": resume_text})
                         st.success("✅ Analysis Complete!")
+
+                        # Split and add resume to FAISS
                         text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=100)
                         chunks = text_splitter.create_documents([resume_text])
                         for chunk in chunks:
-                            chunk.metadata = {"filename": uploaded_file.name, "analysis_summary": analysis_result.summary, "match_score": analysis_result.match_score, "strengths": json.dumps(analysis_result.strengths), "weaknesses": json.dumps(analysis_result.weaknesses)}
+                            chunk.metadata = {
+                                "filename": uploaded_file.name,
+                                "analysis_summary": analysis_result.summary,
+                                "match_score": analysis_result.match_score,
+                                "strengths": json.dumps(analysis_result.strengths),
+                                "weaknesses": json.dumps(analysis_result.weaknesses),
+                            }
                         vector_store.add_documents(chunks, ids=[f"{uploaded_file.name}_{i}" for i in range(len(chunks))])
-                        st.info("💾 Resume has been analyzed and stored in the knowledge base.")
+                        vector_store.save_local("faiss_index")
+
+                        # Show results
                         col1, col2 = st.columns(2)
                         with col1:
                             st.subheader("📊 Suitability Score")
@@ -163,10 +167,11 @@ def main():
                         with col2:
                             st.subheader("📝 Overall Summary")
                             st.write(analysis_result.summary)
+
                         st.subheader("👍 Strengths")
-                        for strength in analysis_result.strengths: st.markdown(f"- {strength}")
+                        for s in analysis_result.strengths: st.markdown(f"- {s}")
                         st.subheader("👎 Weaknesses")
-                        for weakness in analysis_result.weaknesses: st.markdown(f"- {weakness}")
+                        for w in analysis_result.weaknesses: st.markdown(f"- {w}")
                     except Exception as e:
                         st.error(f"An error occurred during analysis: {e}")
 
@@ -184,8 +189,16 @@ def main():
                         for doc, score in results:
                             filename = doc.metadata.get('filename')
                             if filename not in candidates:
-                                candidates[filename] = {'score': score, 'summary': doc.metadata.get('analysis_summary', 'N/A'), 'match_score': doc.metadata.get('match_score', 'N/A'), 'strengths': json.loads(doc.metadata.get('strengths', '[]')), 'weaknesses': json.loads(doc.metadata.get('weaknesses', '[]')), 'chunks': []}
+                                candidates[filename] = {
+                                    'score': score,
+                                    'summary': doc.metadata.get('analysis_summary', 'N/A'),
+                                    'match_score': doc.metadata.get('match_score', 'N/A'),
+                                    'strengths': json.loads(doc.metadata.get('strengths', '[]')),
+                                    'weaknesses': json.loads(doc.metadata.get('weaknesses', '[]')),
+                                    'chunks': []
+                                }
                             candidates[filename]['chunks'].append(doc.page_content)
+
                         for filename, data in candidates.items():
                             with st.expander(f"**📄 {filename}** (Relevance: {data['score']:.2f} | Original Match: {data['match_score']}%)"):
                                 st.markdown(f"**Summary:** {data['summary']}")
