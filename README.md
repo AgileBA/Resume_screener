@@ -1,8 +1,9 @@
-# 📄 Resume Screener
+
+# 📄 Resume Screener (Agentic AI)
 
 An AI-powered **Resume Screening System** that helps recruiters and hiring managers automatically filter, rank, and shortlist candidates based on job descriptions.  
 
-This project leverages **LangChain, Google Generative AI, and ChromaDB** to analyze resumes, extract key skills, and provide relevance scores for better decision-making.  
+This project leverages **LangChain, FAISS, and Google Generative AI** to analyze resumes, extract key skills, and provide relevance scores for better decision-making.  
 
 ---
 
@@ -12,7 +13,7 @@ This project leverages **LangChain, Google Generative AI, and ChromaDB** to anal
 - ✅ Compare Resumes with **Job Descriptions**  
 - ✅ Relevance Scoring & Ranking  
 - ✅ Interactive **Streamlit UI**  
-- ✅ Vector DB (**ChromaDB**) for storage and retrieval  
+- ✅ Vector DB (**FAISS**) for storage and retrieval  
 - ✅ Uses **LangChain + Google Generative AI** for semantic matching  
 
 ---
@@ -23,10 +24,9 @@ This project leverages **LangChain, Google Generative AI, and ChromaDB** to anal
   - `streamlit` – UI framework  
   - `langchain`, `langchain-community`, `langchain-google-genai` – LLM integration  
   - `google-generativeai` – Google Gemini API  
-  - `chromadb` – Vector database for resume embeddings  
+  - `faiss-cpu` – Vector database for resume embeddings  
   - `python-dotenv` – Environment variable management  
   - `docx2txt`, `pypdf` – Resume parsing  
-- **Other**: Pydantic pinned for compatibility  
 
 ---
 
@@ -34,12 +34,12 @@ This project leverages **LangChain, Google Generative AI, and ChromaDB** to anal
 ```
 
 resume\_screener/
-│-- app.py                # Main Streamlit app
-│-- requirements.txt      # Project dependencies
-│-- .env                  # API keys and environment variables
-│-- chroma\_store/         # Vector DB storage
-│-- sample\_resumes/       # Example resumes
-│-- sample\_jd/            # Example job descriptions
+│-- app.py              # Main Streamlit app
+│-- requirements.txt    # Project dependencies
+│-- .env                # API keys and environment variables
+│-- faiss\_index/        # FAISS vector DB storage
+│-- sample\_resumes/     # Example resumes
+│-- sample\_jd/          # Example job descriptions
 
 ````
 
@@ -69,7 +69,7 @@ pip install -r requirements.txt
 
 ### 4️⃣ Setup Environment Variables
 
-Create a **.env** file in the project root and add your API keys:
+Create a **.env** file in the project root and add your API key:
 
 ```
 GOOGLE_API_KEY=your_google_generative_ai_key
@@ -90,12 +90,6 @@ streamlit run app.py
 3. Click **"Screen Candidates"**.
 4. Get **ranked resumes** with match scores.
 
-
-## 🤝 Contributing
-
-Contributions are welcome! Fork this repo, make changes, and submit a PR.
-
 ---
-
 
 
